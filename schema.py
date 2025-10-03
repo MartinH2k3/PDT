@@ -107,5 +107,8 @@ def to_iso_format(date_str: str) -> str:
     except ValueError:
         pass
     # Otherwise, parse as Twitter format
-    dt = datetime.strptime(date_str, '%a %b %d %H:%M:%S %z %Y')
-    return dt.isoformat()
+    try:
+        dt = datetime.strptime(date_str, '%a %b %d %H:%M:%S %z %Y')
+        return dt.isoformat()
+    except ValueError: # If can't parse, return original string, cause it's better than nothing
+        return date_str
