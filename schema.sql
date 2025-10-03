@@ -30,11 +30,11 @@ CREATE TABLE tweets (
     display_from INT,
     display_to INT,
     lang TEXT,
-    user_id BIGINT REFERENCES users(id),
+    user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
     source TEXT,
-    in_reply_to_status_id BIGINT REFERENCES tweets(id),
-    quoted_status_id BIGINT REFERENCES tweets(id),
-    retweeted_status_id BIGINT REFERENCES tweets(id),
+    in_reply_to_status_id BIGINT, -- soft foreign key
+    quoted_status_id BIGINT,      -- soft foreign key
+    retweeted_status_id BIGINT,   -- soft foreign key
     place_id TEXT REFERENCES places(id),
     retweet_count INT,
     favorite_count INT,
