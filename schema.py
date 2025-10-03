@@ -11,7 +11,7 @@ class IgnoreExtraModel(BaseModel):
     }
 
     @model_validator(mode="before")
-    def convert_created_at(self, values):
+    def convert_created_at(cls, values):
         if "created_at" in values and values["created_at"]:
             values["created_at"] = to_iso_format(values["created_at"])
         return values
@@ -107,5 +107,8 @@ def to_iso_format(date_str: str) -> str:
     except ValueError:
         pass
     # Otherwise, parse as Twitter format
-    dt = datetime.strptime(date_str, '%a %b %d %H:%M:%S %z %Y')
-    return dt.isoformat()
+    try:
+        dt = datetime.strptime(date_str, '%a %b %d %H:%M:%S %z %Y')
+        return dt.isoformat()
+    except ValueError: # If can't parse, return original string, cause it's better than nothing
+        return date_str
