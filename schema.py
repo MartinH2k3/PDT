@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+from typing import Optional
+from datetime import datetime
 
 class IgnoreExtraModel(BaseModel):
     def __str__(self):
@@ -7,6 +9,12 @@ class IgnoreExtraModel(BaseModel):
     model_config = {
         "extra": "ignore"
     }
+
+    @model_validator(mode="before")
+    def convert_created_at(self, values):
+        if "created_at" in values and values["created_at"]:
+            values["created_at"] = to_iso_format(values["created_at"])
+        return values
 
 
 class User(IgnoreExtraModel):
@@ -20,8 +28,6 @@ class User(IgnoreExtraModel):
     verified: bool | None = Field(default=None)
     followers_count: int | None = Field(default=0)
     friends_count: int | None = Field(default=0)
-    listed_count: int | None = Field(default=0)
-    favourites_count: int | None = Field(default=0)
     statuses_count: int | None = Field(default=0)
     created_at: str | None = Field(default=None) # UTC datetime
 
@@ -85,7 +91,21 @@ class Tweet(IgnoreExtraModel):
     lang: str | None = Field(default='')
     possibly_sensitive: bool | None = Field(default=None)
     display_text_range: tuple[int, int] | None = Field(default=None)
-    retweeted_status: BaseModel | None = Field(default=None) # References another Tweet object
+    retweeted_status: Optional['Tweet'] = Field(default=None)
+    quoted_status: Optional['Tweet'] = Field(default=None)
     user: User | None = Field(default=None)
     place: Place | None = Field(default=None)
     entities: Entities | None = Field(default=None)
+
+
+def to_iso_format(date_str: str) -> str:
+    # If already in ISO format, return as is
+    try:
+        # Try parsing as ISO format
+        datetime.fromisoformat(date_str)
+        return date_str
+    except ValueError:
+        pass
+    # Otherwise, parse as Twitter format
+    dt = datetime.strptime(date_str, '%a %b %d %H:%M:%S %z %Y')
+    return dt.isoformat()
