@@ -134,7 +134,7 @@ insert_tweet_query = """
     """
 
 def tweet_to_insert_format(tweet: Tweet):
-    return (tweet.id, tweet.created_at, tweet.text, tweet.display_text_range[0], tweet.display_text_range[1], tweet.lang,
+    return (tweet.id, tweet.created_at, tweet.full_text, tweet.display_text_range[0], tweet.display_text_range[1], tweet.lang,
             tweet.user.id, tweet.source, tweet.in_reply_to_status_id,
             tweet.quoted_status_id if tweet.quoted_status_id else tweet.quoted_status.id if tweet.quoted_status else None,
             tweet.retweeted_status.id if tweet.retweeted_status else None,

@@ -81,7 +81,7 @@ class Entities(IgnoreExtraModel):
 
 class Tweet(IgnoreExtraModel):
     id: int
-    text: str | None = Field(default='')
+    full_text: str | None = Field(default='')
     source: str | None = Field(default='')
     in_reply_to_status_id: int | None = Field(default=None)
     quoted_status_id: int | None = Field(default=None)
