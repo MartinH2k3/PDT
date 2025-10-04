@@ -16,6 +16,18 @@ class IgnoreExtraModel(BaseModel):
             values["created_at"] = to_iso_format(values["created_at"])
         return values
 
+    @model_validator(mode="before")
+    def clean_nul_bytes(cls, values):
+        def clean(val):
+            if isinstance(val, str):
+                return val.replace('\x00', '')
+            if isinstance(val, dict):
+                return {k: clean(v) for k, v in val.items()}
+            if isinstance(val, list):
+                return [clean(v) for v in val]
+            return val
+        return clean(values)
+
 
 class User(IgnoreExtraModel):
     id: int
