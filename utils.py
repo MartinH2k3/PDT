@@ -29,7 +29,7 @@ def get_dsn():
     return " ".join(f"{k}={v}" for k, v in db_params.items() if v)
 
 
-def build_schema(schema_file_name: str = 'schema.sql', connection = None):
+def build_schema(schema_file_name: str = 'sql_scripts/schema.sql', connection = None):
     connection_passed = connection is not None
     if not connection_passed:
         connection = get_connection()
