@@ -97,6 +97,9 @@ CREATE TABLE tweet_media (
 -- Indexes for foreign keys to speed up joins and ON DELETE operations
 CREATE INDEX idx_tweets_user_id ON tweets(user_id);
 CREATE INDEX idx_tweets_place_id ON tweets(place_id);
+CREATE INDEX ix_tweets_in_reply_to_status_id ON tweets(in_reply_to_status_id);
+CREATE INDEX ix_tweets_quoted_status_id ON tweets(quoted_status_id);
+CREATE INDEX ix_tweets_retweeted_status_id ON tweets(retweeted_status_id);
 
 CREATE INDEX idx_tweet_hashtag_tweet_id ON tweet_hashtag(tweet_id);
 CREATE INDEX idx_tweet_hashtag_hashtag_id ON tweet_hashtag(hashtag_id);
