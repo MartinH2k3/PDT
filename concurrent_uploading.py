@@ -7,13 +7,14 @@ from schema import *
 from psycopg2.pool import ThreadedConnectionPool
 from logger import Logger
 
+BATCH_SIZE = os.getenv("BATCH_SIZE", 100)
+RETRY_LIMIT = os.getenv("RETRY_LIMIT", 3)
+WORKER_COUNT = os.getenv("WORKER_COUNT", 16)
+
 log = Logger()
-pool = ThreadedConnectionPool(minconn=1, maxconn=50, dsn=get_dsn())
 
-seen_ids = set()
-seen_ids_lock = threading.Lock()
 
-def process_file(tweets_file_path, max_line):
+def process_file(tweets_file_path, max_line: int|None = None):
     conn = pool.getconn()
     cur = conn.cursor()
     line_count = 0
@@ -56,10 +57,9 @@ def process_file(tweets_file_path, max_line):
         if _tweet.retweeted_status:
             parse_tweet(_tweet.retweeted_status)
 
-
     with open(tweets_file_path, 'r') as file:
         for line in file:
-            if line_count >= max_line:
+            if max_line and line_count >= max_line:
                 break
             tweet_json = json.loads(line)
             try:
@@ -67,12 +67,11 @@ def process_file(tweets_file_path, max_line):
                 parse_tweet(tweet)
 
             except Exception as e:
-                #print(json.dumps(tweet_json, indent=2))
-                print(f"Error parsing tweet JSON: {e}")
+                log.error(f"Error parsing tweet JSON: {e}")
                 break
             line_count += 1
 
-            if line_count % 100 == 0:
+            if line_count % BATCH_SIZE == 0:
                 # try 3 times if deadlock detected, if fails, you will commit these with next batch
                 for insert_func, args, batch in [
                     (insert_users, (cur, users_batch), users_batch),
@@ -83,14 +82,15 @@ def process_file(tweets_file_path, max_line):
                     (insert_medias, (cur, tweet.id, media_batch), media_batch),
                     (insert_temp_user_mentions, (cur, tweet.id, temp_user_mentions_batch), temp_user_mentions_batch),
                 ]:
-                    for i in range(3):
+                    for i in range(RETRY_LIMIT):
                         try:
                             insert_func(*args)
                             conn.commit()
                             batch.clear()  # Only clear if successful
+                            log.info(f"Inserted batch of {len(batch)} using {insert_func.__name__}", False)
                             break
                         except psycopg2.Error:
-                            log.error(f"Deadlock with {insert_func.__name__}, retrying {i+1}/3")
+                            log.error(f"Deadlock with {insert_func.__name__}, retrying {i+1}/3", False)
                             conn.rollback()
                             sleep(1)
 
@@ -116,20 +116,23 @@ def process_file(tweets_file_path, max_line):
 
     # Debug print
     time_after = time()
-    print(f"Inserted {line_count} tweets from {os.path.basename(tweets_file_path)} in {time_after - time_before:.2f} seconds.")
+    log.info(f"Inserted {line_count} tweets from {os.path.basename(tweets_file_path)} in {time_after - time_before:.2f} seconds.")
 
 
 data_dir = "data"
-max_workers = 16
-
 jsonl_files = [os.path.join(data_dir, f) for f in os.listdir(data_dir) if f.endswith(".jsonl")]
 
+pool = ThreadedConnectionPool(minconn=1, maxconn=len(jsonl_files), dsn=get_dsn())
+
+seen_ids = set()
+seen_ids_lock = threading.Lock()
+
 total_time_before = time()
-with cf.ThreadPoolExecutor(max_workers=max_workers) as executor:
-    futures = [executor.submit(process_file, file_path, 50) for file_path in jsonl_files]
+with cf.ThreadPoolExecutor(max_workers=WORKER_COUNT) as executor:
+    futures = [executor.submit(process_file, file_path, 5000) for file_path in jsonl_files]
     # to check if all threads went fine
     for future in cf.as_completed(futures):
         future.result()
 
 total_time_after = time()
-print(f"Processed {len(jsonl_files)} files in {total_time_after - total_time_before:.2f} seconds.")
+log.info(f"Processed {len(jsonl_files)} files in {total_time_after - total_time_before:.2f} seconds.")
