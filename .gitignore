@@ -2,3 +2,5 @@
 .idea
 .env
 data
+test.py
+log.txt
