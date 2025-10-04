@@ -3,8 +3,9 @@ from dotenv import load_dotenv
 import psycopg2
 from schema import *
 
+load_dotenv()
+
 def get_connection():
-    load_dotenv()
     db_params = {
         'host': os.getenv('DB_HOST', 'localhost'),
         'port': os.getenv('DB_PORT', '5432'),
@@ -17,7 +18,6 @@ def get_connection():
 
 
 def get_dsn():
-    load_dotenv()
     db_params = {
         'host': os.getenv('DB_HOST', 'localhost'),
         'port': os.getenv('DB_PORT', '5432'),
