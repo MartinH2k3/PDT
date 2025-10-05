@@ -108,9 +108,9 @@ def process_file(tweets_file_path, max_line: int|None = None):
                 if not line.strip():
                     continue
                 tweet_json = json.loads(line)
-                # if 'extended_entities' in tweet_json:
-                #     tweet_json['entities'] = merge_entities(tweet_json.get('entities', {}),
-                #                                             tweet_json['extended_entities'])
+                if 'extended_entities' in tweet_json:
+                    tweet_json['entities'] = merge_entities(tweet_json.get('entities', {}),
+                                                            tweet_json['extended_entities'])
                 try:
                     tweet = Tweet.model_validate(tweet_json)
                     parse_tweet(tweet)
@@ -133,21 +133,27 @@ def process_file(tweets_file_path, max_line: int|None = None):
                     try_insert_with_retries(insert_temp_user_mentions, (cur, temp_user_mentions_batch), temp_user_mentions_batch, conn, "temp_user_mentions")
 
         # insert remaining
-        some_left = True
-        while some_left:
-            try:
-                insert_users(cur, users_batch)
-                insert_places(cur, places_batch)
-                insert_tweets(cur, tweets_batch)
-                insert_hashtags_and_link(cur, hashtags_batch)
-                insert_urls(cur, urls_batch)
-                insert_medias(cur, media_batch)
-                insert_temp_user_mentions(cur, temp_user_mentions_batch)
-                conn.commit()
-                some_left = False
-            except psycopg2.Error:
-                conn.rollback()
-                sleep(1)
+        while len(users_batch) or len(places_batch):
+            if len(users_batch):
+                try_insert_with_retries(insert_users, (cur, users_batch), users_batch, conn, "users")
+            if len(places_batch):
+                try_insert_with_retries(insert_places, (cur, places_batch), places_batch, conn, "places")
+
+        while len(tweets_batch):
+            try_insert_with_retries(insert_tweets, (cur, tweets_batch), tweets_batch, conn, "tweets")
+
+        while len(hashtags_batch) or len(urls_batch) or len(media_batch) or len(temp_user_mentions_batch):
+            if len(hashtags_batch):
+                try_insert_with_retries(insert_hashtags_and_link, (cur, hashtags_batch), hashtags_batch, conn, "hashtags")
+            if len(urls_batch):
+                try_insert_with_retries(insert_urls, (cur, urls_batch), urls_batch, conn, "urls")
+            if len(media_batch):
+                try_insert_with_retries(insert_medias, (cur, media_batch), media_batch, conn, "medias")
+            if len(temp_user_mentions_batch):
+                try_insert_with_retries(insert_temp_user_mentions, (cur, temp_user_mentions_batch), temp_user_mentions_batch, conn, "temp_user_mentions")
+
+
+
     except Exception as e:
         log.error(f"Error processing file {tweets_file_path}: {e}")
     finally:
@@ -176,4 +182,5 @@ with cf.ThreadPoolExecutor(max_workers=WORKER_COUNT) as executor:
             log.error(f"Error in thread: {e}")
 
 total_time_after = time()
+pool.closeall()
 log.info(f"Processed {len(jsonl_files)} files in {total_time_after - total_time_before:.2f} seconds.")
