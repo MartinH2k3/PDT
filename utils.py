@@ -84,6 +84,49 @@ def cleanup_schema(connection = None):
             connection.close()
 
 
+def count_all_tables(connection = None):
+    connection_passed = connection is not None
+    if not connection_passed:
+        connection = get_connection()
+
+    cursor = connection.cursor()
+
+    sql_statement = """
+    SELECT
+        (SELECT COUNT(*) FROM users) AS users_count,
+        (SELECT COUNT(*) FROM places) AS places_count,
+        (SELECT COUNT(*) FROM tweets) AS tweets_count,
+        (SELECT COUNT(*) FROM hashtags) AS hashtags_count,
+        (SELECT COUNT(*) FROM tweet_hashtag) AS tweet_hashtag_count,
+        (SELECT COUNT(*) FROM tweet_urls) AS tweet_urls_count,
+        (SELECT COUNT(*) FROM tweet_media) AS tweet_media_count,
+        (SELECT COUNT(*) FROM tweet_user_mentions) AS tweet_user_mentions_count,
+        (SELECT COUNT(*) FROM temp_tweet_user_mentions) AS temp_tweet_user_mentions_count;
+    """
+
+    try:
+        cursor.execute(sql_statement)
+        result = cursor.fetchone()
+        return {
+            'users': result[0],
+            'places': result[1],
+            'tweets': result[2],
+            'hashtags': result[3],
+            'tweet_hashtag': result[4],
+            'tweet_urls': result[5],
+            'tweet_media': result[6],
+            'tweet_user_mentions': result[7],
+            'temp_tweet_user_mentions': result[8],
+        }
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return {}
+    finally:
+        cursor.close()
+        if not connection_passed:
+            connection.close()
+
+
 insert_user_query = """
     INSERT INTO users (id, name, screen_name, location, description, followers_count, friends_count, statuses_count, created_at)
     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
