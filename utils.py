@@ -206,8 +206,8 @@ def user_mention_to_insert_format(tweet_id, user_mention: UserMention):
 def insert_temp_user_mention(cursor, tweet_id, user_mention: UserMention):
     cursor.execute(insert_temp_user_mention_query, user_mention_to_insert_format(tweet_id, user_mention))
 
-def insert_temp_user_mentions(cursor, tweet_id, user_mentions: list[UserMention]):
-    data = [user_mention_to_insert_format(tweet_id, user_mention) for user_mention in user_mentions]
+def insert_temp_user_mentions(cursor, tweet_user_mentions: list[tuple[int, UserMention]]):
+    data = [user_mention_to_insert_format(tweet_id, user_mention) for tweet_id, user_mention in tweet_user_mentions]
     cursor.executemany(insert_temp_user_mention_query, data)
 
 
@@ -223,8 +223,8 @@ def insert_media_format(tweet_id, media: Media):
 def insert_media(cursor, tweet_id, media: Media):
     cursor.execute(insert_media_query, insert_media_format(tweet_id, media))
 
-def insert_medias(cursor, tweet_id, medias: list[Media]):
-    data = [insert_media_format(tweet_id, media) for media in medias]
+def insert_medias(cursor, tweet_medias: list[tuple[int, Media]]):
+    data = [insert_media_format(tweet_id, media) for tweet_id, media in tweet_medias]
     cursor.executemany(insert_media_query, data)
 
 
@@ -246,8 +246,8 @@ def insert_url_format(tweet_id, url: Url):
 def insert_url(cursor, tweet_id, url: Url):
     cursor.execute(insert_url_query, insert_url_format(tweet_id, url))
 
-def insert_urls(cursor, tweet_id, urls: list[Url]):
-    data = [insert_url_format(tweet_id, url) for url in urls]
+def insert_urls(cursor, tweet_urls: list[tuple[int, Url]]):
+    data = [insert_url_format(tweet_id, url) for tweet_id, url in tweet_urls]
     cursor.executemany(insert_url_query, data)
 
 
@@ -276,18 +276,26 @@ def insert_hashtag(cursor, tweet_id, hashtag: Hashtag):
     cursor.execute(insert_tweet_hashtag_query, (tweet_id, hashtag_id))
 
 # This one is GPT generated
-def insert_hashtags_and_link(cursor, tweet_id, hashtags: list[Hashtag]):
-    # 1. Insert all hashtags (ignore conflicts)
+def insert_hashtags_and_link(cursor, tweet_hashtags: list[tuple[int, Hashtag]]):
+    # Group hashtags by tweet_id
+    from collections import defaultdict
+    tweet_to_hashtags = defaultdict(list)
+    for tweet_id, hashtag in tweet_hashtags:
+        tweet_to_hashtags[tweet_id].append(hashtag)
+
+    # Insert all hashtags (ignore conflicts)
+    all_hashtags = [h for _, h in tweet_hashtags]
     insert_query = """
     INSERT INTO hashtags (tag)
     VALUES (%s)
     ON CONFLICT (tag) DO NOTHING;
     """
-    tags = [(h.text,) for h in hashtags]
-    cursor.executemany(insert_query, tags)
+    tags = [(h.text,) for h in all_hashtags]
+    if tags:
+        cursor.executemany(insert_query, tags)
 
-    # 2. Fetch all hashtag IDs at once
-    tag_texts = [h.text for h in hashtags]
+    # Fetch all hashtag IDs at once
+    tag_texts = list({h.text for h in all_hashtags})
     if tag_texts:
         select_query = "SELECT id, tag FROM hashtags WHERE tag IN %s"
         cursor.execute(select_query, (tuple(tag_texts),))
@@ -295,14 +303,19 @@ def insert_hashtags_and_link(cursor, tweet_id, hashtags: list[Hashtag]):
     else:
         tag_id_map = {}
 
-    # 3. Batch-insert tweet_hashtag links
-    tweet_hashtag_data = [(tweet_id, tag_id_map[h.text]) for h in hashtags if h.text in tag_id_map]
+    # Batch-insert tweet_hashtag links
+    tweet_hashtag_data = []
+    for tweet_id, hashtags in tweet_to_hashtags.items():
+        for h in hashtags:
+            if h.text in tag_id_map:
+                tweet_hashtag_data.append((tweet_id, tag_id_map[h.text]))
     insert_tweet_hashtag_query = """
     INSERT INTO tweet_hashtag (tweet_id, hashtag_id)
     VALUES (%s, %s)
     ON CONFLICT DO NOTHING;
     """
-    cursor.executemany(insert_tweet_hashtag_query, tweet_hashtag_data)
+    if tweet_hashtag_data:
+        cursor.executemany(insert_tweet_hashtag_query, tweet_hashtag_data)
 
 
 insert_place_query = """
