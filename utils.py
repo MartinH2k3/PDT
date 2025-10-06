@@ -74,6 +74,8 @@ def cleanup_schema(connection = None):
     try:
         cursor.execute(sql_statement)
         connection.commit()
+        connection.autocommit = True
+        cursor.execute("VACUUM;")
         print("Schema cleaned up successfully.")
     except Exception as e:
         connection.rollback()
