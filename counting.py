@@ -71,8 +71,6 @@ def process_file(tweets_file_path, max_line: int|None = None):
     def parse_tweet(_tweet: Tweet):
         # Tweets
         with tweets_lock:
-            if _tweet.id in tweets_set:
-                return
             tweets_set.add(_tweet.id)
         # Users
         if _tweet.user:
