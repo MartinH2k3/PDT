@@ -24,13 +24,16 @@ tweets_lock = threading.Lock()
 hashtags_set: set[str] = set()
 hashtags_lock = threading.Lock()
 
-urls_set: set[str] = set()
+tweet_hashtags_set: set[tuple[int, str]] = set()
+tweet_hashtags_lock = threading.Lock()
+
+urls_set: set[tuple[int, str]] = set()
 urls_lock = threading.Lock()
 
-media_set: set[int] = set()
+media_set: set[tuple[int, int]] = set()
 media_lock = threading.Lock()
 
-user_mentions_set: set[int] = set()
+user_mentions_set: set[tuple[int, int]] = set()
 user_mentions_lock = threading.Lock()
 # --- End global sets and locks ---
 
@@ -88,19 +91,19 @@ def process_file(tweets_file_path, max_line: int|None = None):
             if _tweet.entities.urls:
                 with urls_lock:
                     for url in _tweet.entities.urls:
-                        urls_set.add(url.expanded_url)
+                        urls_set.add((_tweet.id, url.url))
             if _tweet.entities.media:
                 with media_lock:
                     for media in _tweet.entities.media:
-                        media_set.add(media.id)
+                        media_set.add((_tweet.id, media.id))
             if _tweet.entities.user_mentions:
                 with user_mentions_lock:
                     for user_mention in _tweet.entities.user_mentions:
-                        user_mentions_set.add(user_mention.id)
-        # if _tweet.quoted_status:
-        #     parse_tweet(_tweet.quoted_status)
-        # if _tweet.retweeted_status:
-        #     parse_tweet(_tweet.retweeted_status)
+                        user_mentions_set.add((_tweet.id, user_mention.id))
+        if _tweet.quoted_status:
+            parse_tweet(_tweet.quoted_status)
+        if _tweet.retweeted_status:
+            parse_tweet(_tweet.retweeted_status)
 
     try:
         with open(tweets_file_path, 'r') as file:
