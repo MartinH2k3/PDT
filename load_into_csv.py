@@ -1,6 +1,6 @@
 import json
 import csv
-from time import time, sleep
+from time import time
 import concurrent.futures as cf
 import threading
 from schema import *
@@ -130,12 +130,17 @@ def process_file(tweets_file_path, max_line: int|None = None):
         # hashtags
         if _tweet.entities and _tweet.entities.hashtags:
             for h in _tweet.entities.hashtags:
+                tag = h.text or ''
                 with hashtags_lock:
-                    key = h.text or ''
-                    if key in hashtags_set:
+                    if h.text in hashtags_set:
                         pass
                     else:
-                        hashtags_set.add(key)
+                        hashtags_set.add(tag)
+                with tweet_hashtags_lock:
+                    if (_tweet.id ,tag) in tweet_hashtags_set:
+                        pass
+                    else:
+                        tweet_hashtags_set.add((_tweet.id, tag))
                         hashtags_list.append([
                             str(_tweet.id),
                             f'"{h.text or ""}"'
@@ -261,7 +266,7 @@ def process_file(tweets_file_path, max_line: int|None = None):
 for file_path in jsonl_files:
     base_name = os.path.basename(file_path)[29:]
     base_file_name = os.path.splitext(base_name)[0]
-    for table in ["users", "places", "tweets", "hashtags", "urls", "media", "user_mentions"]:
+    for table in ["users", "places", "tweets", "tweet_hashtag", "urls", "media", "user_mentions"]:
         csv_file_path = f"output/{base_file_name}_{table}.csv"
         if os.path.exists(csv_file_path):
             os.remove(csv_file_path)
@@ -292,3 +297,9 @@ for table in ["users", "places", "tweets", "hashtags", "urls", "media", "user_me
                     file_content = infile.read()
                     outfile.write(file_content)
                 os.remove(csv_file_path)  # remove the individual file after merging
+
+# add all hashtags from hashtag set into hashtag.csv
+with open(f"output/hashtags.csv", 'w', newline='', encoding='utf-8') as hashtag_file:
+    writer = csv.writer(hashtag_file)
+    for hashtag in hashtags_set:
+        writer.writerow([hashtag])
