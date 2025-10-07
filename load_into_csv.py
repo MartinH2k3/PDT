@@ -7,7 +7,7 @@ from schema import *
 import os
 from logger import Logger
 
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", 1000))
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 10000))
 RETRY_LIMIT = int(os.getenv("RETRY_LIMIT", 3))
 WORKER_COUNT = int(os.getenv("WORKER_COUNT", 16))
 
@@ -37,6 +37,12 @@ urls_lock = threading.Lock()
 
 media_set: set[tuple[int, int]] = set()
 media_lock = threading.Lock()
+
+user_mentions_set: set[tuple[int, int]] = set()
+user_mentions_lock = threading.Lock()
+
+missing_mentioned_users_lock = threading.Lock()
+missing_mentioned_users_set: set[int] = set()
 
 def process_file(tweets_file_path, max_line: int|None = None):
     def merge_entities(entities: dict, extended_entities: dict) -> dict:
@@ -71,6 +77,9 @@ def process_file(tweets_file_path, max_line: int|None = None):
         # users
         sender = _tweet.user
         with users_lock:
+            if sender.id in missing_mentioned_users_set:
+                with missing_mentioned_users_lock:
+                    missing_mentioned_users_set.remove(sender.id)
             if sender.id in users_set:
                 pass
             else:
@@ -167,16 +176,6 @@ def process_file(tweets_file_path, max_line: int|None = None):
                             f'"{u.unwound_url or ""}"'
                         ])
 
-        # user_mentions (no set/lock for user_mentions, as no global set is defined)
-        if _tweet.entities and _tweet.entities.user_mentions:
-            for um in _tweet.entities.user_mentions:
-                user_mentions.append([
-                    str(_tweet.id),
-                    str(um.id) if um.id is not None else '',
-                    f'"{um.screen_name or ""}"',
-                    f'"{um.name or ""}"'
-                ])
-
         # media
         if _tweet.entities and _tweet.entities.media:
             for m in _tweet.entities.media:
@@ -194,6 +193,23 @@ def process_file(tweets_file_path, max_line: int|None = None):
                             f'"{m.media_url_https or ""}"',
                             f'"{m.display_url or ""}"',
                             f'"{m.expanded_url or ""}"'
+                        ])
+
+        # user mentions
+        if _tweet.entities and _tweet.entities.user_mentions:
+            for um in _tweet.entities.user_mentions:
+                with user_mentions_lock:
+                    if (um.id, _tweet.id) in user_mentions_set:
+                        pass
+                    else:
+                        user_mentions_set.add((um.id, _tweet.id))
+                        with missing_mentioned_users_lock:
+                            missing_mentioned_users_set.add(um.id)
+                        user_mentions.append([
+                            str(_tweet.id),
+                            str(um.id) if um.id is not None else '',
+                            f'"{um.screen_name or ""}"',
+                            f'"{um.name or ""}"'
                         ])
 
         # nested tweets
@@ -287,8 +303,8 @@ with cf.ThreadPoolExecutor(max_workers=WORKER_COUNT) as executor:
 
 total_time_after = time()
 log.info(f"All files processed in {total_time_after - total_time_before:.2f} seconds.")
+log.info(f"Unique users: {len(users_set)}, places: {len(places_set)}, tweets: {len(tweets_set)}, hashtags: {len(hashtags_map)}, urls: {len(urls_set)}, media: {len(media_set)}, user_mentions (including those with missing references): {len(user_mentions_set)}, user_mentions (only those with missing references): {len(missing_mentioned_users_set)}")
 
-time_before_joining_csv_files = time()
 # join all csv files into one for each table
 for table in ["users", "places", "tweets", "tweet_hashtag", "urls", "media", "user_mentions"]:
     with open(f"output/{table}.csv", 'w', newline='', encoding='utf-8') as outfile:
@@ -301,6 +317,18 @@ for table in ["users", "places", "tweets", "tweet_hashtag", "urls", "media", "us
                     file_content = infile.read()
                     outfile.write(file_content)
                 os.remove(csv_file_path)  # remove the individual file after merging
+
+# insert 'null users' into users table as well
+with open(f"output/users.csv", 'a', newline='', encoding='utf-8') as users_file:
+    writer = csv.writer(users_file)
+    for user_id in missing_mentioned_users_set:
+        writer.writerow([user_id, '', '', '', '', '', '0', '0', '0', '', '', ''])
+
+# keep track of 'null users' that were mentioned but not present in the users table, to remove later
+with open(f"output/temp_users.csv", 'w', newline='', encoding='utf-8') as temp_users:
+    writer = csv.writer(temp_users)
+    for user_id in missing_mentioned_users_set:
+        writer.writerow([user_id])
 
 # add all hashtags from hashtag set into hashtag.csv
 with open(f"output/hashtags.csv", 'w', newline='', encoding='utf-8') as hashtag_file:

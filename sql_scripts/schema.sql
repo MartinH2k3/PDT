@@ -13,7 +13,11 @@ CREATE TABLE users (
     url TEXT
 );
 
--- PLACES table
+-- Temporary table for nonexistent users referenced in tweet_user_mentions
+CREATE TABLE temp_users (
+    id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE TABLE places (
     id TEXT PRIMARY KEY,
     full_name TEXT,
@@ -22,7 +26,6 @@ CREATE TABLE places (
     place_type TEXT
 );
 
--- TWEETS table
 CREATE TABLE tweets (
     id BIGINT PRIMARY KEY,
     created_at TIMESTAMP,
@@ -41,20 +44,17 @@ CREATE TABLE tweets (
     possibly_sensitive BOOLEAN
 );
 
--- HASHTAGS table
 CREATE TABLE hashtags (
     id BIGSERIAL PRIMARY KEY,
     tag TEXT UNIQUE
 );
 
--- TWEET_HASHTAG table (many-to-many)
 CREATE TABLE tweet_hashtag (
     tweet_id BIGINT REFERENCES tweets(id) ON DELETE CASCADE,
     hashtag_id BIGINT REFERENCES hashtags(id) ON DELETE CASCADE,
     PRIMARY KEY (tweet_id, hashtag_id)
 );
 
--- TWEET_URLS table
 CREATE TABLE tweet_urls (
     tweet_id BIGINT REFERENCES tweets(id) ON DELETE CASCADE,
     url TEXT,
@@ -64,7 +64,6 @@ CREATE TABLE tweet_urls (
     PRIMARY KEY (tweet_id, url)
 );
 
--- TWEET_USER_MENTIONS table
 CREATE TABLE tweet_user_mentions (
     tweet_id BIGINT REFERENCES tweets(id) ON DELETE CASCADE,
     mentioned_user_id BIGINT REFERENCES users(id),
@@ -73,16 +72,6 @@ CREATE TABLE tweet_user_mentions (
     PRIMARY KEY (tweet_id, mentioned_user_id)
 );
 
--- Temporary TWEET_USER_MENTIONS table before users get loaded
-CREATE TABLE temp_tweet_user_mentions (
-     tweet_id BIGINT,
-     mentioned_user_id BIGINT,
-     mentioned_screen_name TEXT,
-     mentioned_name TEXT,
-     PRIMARY KEY (tweet_id, mentioned_user_id)
-);
-
--- TWEET_MEDIA table
 CREATE TABLE tweet_media (
     tweet_id BIGINT REFERENCES tweets(id) ON DELETE CASCADE,
     media_id BIGINT,
