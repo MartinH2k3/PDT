@@ -25,7 +25,8 @@ places_lock = threading.Lock()
 tweets_set = set()
 tweets_lock = threading.Lock()
 
-hashtags_set: set[str] = set()
+hashtags_map: dict[str, int] = dict()
+curr_hashtag_id = 1
 hashtags_lock = threading.Lock()
 
 tweet_hashtags_set: set[tuple[int, str]] = set()
@@ -66,7 +67,7 @@ def process_file(tweets_file_path, max_line: int|None = None):
 
     def parse_tweet(_tweet: Tweet):
         nonlocal users, places, tweets, hashtags_list, urls, media, user_mentions
-
+        global curr_hashtag_id
         # users
         sender = _tweet.user
         with users_lock:
@@ -133,15 +134,17 @@ def process_file(tweets_file_path, max_line: int|None = None):
             for h in _tweet.entities.hashtags:
                 tag: str = h.text.lower() or ''
                 with hashtags_lock:
-                    if tag in hashtags_set:
-                        pass
+                    if tag in hashtags_map:
+                        hashtag_id = hashtags_map[tag]
                     else:
-                        hashtags_set.add(tag)
+                        hashtag_id = curr_hashtag_id
+                        hashtags_map[tag] = curr_hashtag_id
+                        curr_hashtag_id += 1
                 with tweet_hashtags_lock:
-                    if (_tweet.id ,tag) in tweet_hashtags_set:
+                    if (_tweet.id ,hashtag_id) in tweet_hashtags_set:
                         pass
                     else:
-                        tweet_hashtags_set.add((_tweet.id, tag))
+                        tweet_hashtags_set.add((_tweet.id, hashtag_id))
                         hashtags_list.append([
                             str(_tweet.id),
                             tag
@@ -302,5 +305,5 @@ for table in ["users", "places", "tweets", "tweet_hashtag", "urls", "media", "us
 # add all hashtags from hashtag set into hashtag.csv
 with open(f"output/hashtags.csv", 'w', newline='', encoding='utf-8') as hashtag_file:
     writer = csv.writer(hashtag_file)
-    for hashtag in hashtags_set:
-        writer.writerow([hashtag])
+    for hashtag in hashtags_map:
+        writer.writerow([hashtags_map[hashtag], hashtag])
