@@ -14,7 +14,7 @@ CREATE TABLE users (
 );
 
 CREATE TABLE temp_users (
-    id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE
+    id BIGINT PRIMARY KEY
 );
 
 -- PLACES table
@@ -103,9 +103,6 @@ CREATE INDEX idx_tweet_urls_tweet_id ON tweet_urls(tweet_id);
 
 CREATE INDEX idx_tweet_user_mentions_tweet_id ON tweet_user_mentions(tweet_id);
 CREATE INDEX idx_tweet_user_mentions_mentioned_user_id ON tweet_user_mentions(mentioned_user_id);
-
-CREATE INDEX idx_temp_tweet_user_mentions_tweet_id ON temp_tweet_user_mentions(tweet_id);
-CREATE INDEX idx_temp_tweet_user_mentions_mentioned_user_id ON temp_tweet_user_mentions(mentioned_user_id);
 
 CREATE INDEX idx_tweet_media_tweet_id ON tweet_media(tweet_id);
 
