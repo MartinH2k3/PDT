@@ -65,10 +65,6 @@ def process_file(tweets_file_path, max_line: int|None = None):
         return merged
 
     def parse_tweet(_tweet: Tweet):
-        # tweets
-        with tweets_lock:
-            tweets_set.add(_tweet.id)
-
         nonlocal users, places, tweets, hashtags_list, urls, media, user_mentions
 
         # users
@@ -108,24 +104,29 @@ def process_file(tweets_file_path, max_line: int|None = None):
                         f'"{_tweet.place.place_type or ""}"'
                     ])
 
-        # tweets (already checked above, just append)
-        tweets.append([
-            str(_tweet.id),
-            to_iso_format(_tweet.created_at) if _tweet.created_at else '',
-            'B', #_tweet.full_text or '',
-            str(_tweet.display_text_range[0]) or '',
-            str(_tweet.display_text_range[1]) or '',
-            f'"{_tweet.lang or ""}"',
-            str(_tweet.user.id) if _tweet.user else '',
-            f'"{_tweet.source or ""}"',
-            str(_tweet.in_reply_to_status_id) if _tweet.in_reply_to_status_id is not None else '',
-            str(_tweet.quoted_status_id) if _tweet.quoted_status_id is not None else '',
-            str(_tweet.retweeted_status.id) if _tweet.retweeted_status is not None else '',
-            _tweet.place.id if _tweet.place else '',
-            str(_tweet.retweet_count) if _tweet.retweet_count is not None else '',
-            str(_tweet.favorite_count) if _tweet.favorite_count is not None else '',
-            str(_tweet.possibly_sensitive) if _tweet.possibly_sensitive is not None else ''
-        ])
+        # tweets
+        with tweets_lock:
+            if _tweet.id in tweets_set:
+                pass
+            else:
+                tweets_set.add(_tweet.id)
+                tweets.append([
+                    str(_tweet.id),
+                    to_iso_format(_tweet.created_at) if _tweet.created_at else '',
+                    'B', #_tweet.full_text or '',
+                    str(_tweet.display_text_range[0]) or '',
+                    str(_tweet.display_text_range[1]) or '',
+                    f'"{_tweet.lang or ""}"',
+                    str(_tweet.user.id) if _tweet.user else '',
+                    f'"{_tweet.source or ""}"',
+                    str(_tweet.in_reply_to_status_id) if _tweet.in_reply_to_status_id is not None else '',
+                    str(_tweet.quoted_status_id) if _tweet.quoted_status_id is not None else '',
+                    str(_tweet.retweeted_status.id) if _tweet.retweeted_status is not None else '',
+                    _tweet.place.id if _tweet.place else '',
+                    str(_tweet.retweet_count) if _tweet.retweet_count is not None else '',
+                    str(_tweet.favorite_count) if _tweet.favorite_count is not None else '',
+                    str(_tweet.possibly_sensitive) if _tweet.possibly_sensitive is not None else ''
+                ])
 
         # hashtags
         if _tweet.entities and _tweet.entities.hashtags:
