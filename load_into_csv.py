@@ -130,9 +130,9 @@ def process_file(tweets_file_path, max_line: int|None = None):
         # hashtags
         if _tweet.entities and _tweet.entities.hashtags:
             for h in _tweet.entities.hashtags:
-                tag = h.text or ''
+                tag: str = h.text.lower() or ''
                 with hashtags_lock:
-                    if h.text in hashtags_set:
+                    if tag in hashtags_set:
                         pass
                     else:
                         hashtags_set.add(tag)
@@ -143,7 +143,7 @@ def process_file(tweets_file_path, max_line: int|None = None):
                         tweet_hashtags_set.add((_tweet.id, tag))
                         hashtags_list.append([
                             str(_tweet.id),
-                            f'"{h.text or ""}"'
+                            tag
                         ])
 
         # urls
@@ -286,7 +286,7 @@ log.info(f"All files processed in {total_time_after - total_time_before:.2f} sec
 
 time_before_joining_csv_files = time()
 # join all csv files into one for each table
-for table in ["users", "places", "tweets", "hashtags", "urls", "media", "user_mentions"]:
+for table in ["users", "places", "tweets", "tweet_hashtag", "urls", "media", "user_mentions"]:
     with open(f"output/{table}.csv", 'w', newline='', encoding='utf-8') as outfile:
         for file_path in jsonl_files:
             base_name = os.path.basename(file_path)[29:]
